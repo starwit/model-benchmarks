@@ -43,6 +43,7 @@ def prepare_input(image, stride):
     return out_img.unsqueeze(0)
 
 @torch.no_grad()
+@torch.cpu.amp.autocast()
 def infer(model, input_image):
 
     metrics = Metrics()
@@ -70,13 +71,16 @@ if __name__ == '__main__':
         device=TORCH_DEVICE,
         fp16=False
     )
+    model.eval()
     input_image_size = check_imgsz(INFERENCE_SIZE, stride=model.stride)
 
+    import intel_extension_for_pytorch as ipex
+    model = ipex.optimize(model, dtype=torch.bfloat16)
     
     with open('metrics.csv', 'w', newline='') as metrics_file:
         csv_writer = csv.DictWriter(metrics_file, fieldnames=Metrics.__dataclass_fields__)
 
-        for basename, frame in frame_iter('/home/florian/workspaces/vision/object-detector/.demo_frames'):
+        for basename, frame in frame_iter('/home/devcloud/workspaces/videos/ArchWestMainStreetEB'):
             metrics, _ = infer(model, frame)
             csv_writer.writerow(metrics.__dict__)
         
