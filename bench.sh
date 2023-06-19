@@ -33,3 +33,10 @@ numactl -N 0 -C 0-47 -m 0 python benchmark.py -s 48t -b 10 -i ~/workspaces/datas
 numactl -N 0 -C 0-47 -m 0 python benchmark.py -s 48t -b 20 -i ~/workspaces/datasets/carmel/ArchWestMainStreetEB/
 numactl -N 0 -C 0-47 -m 0 python benchmark.py -s 48t -b 40 -i ~/workspaces/datasets/carmel/ArchWestMainStreetEB/
 
+numactl -N 0 -m 0 python benchmark.py -s 112t -b 1 -i ~/workspaces/datasets/carmel/ArchWestMainStreetEB/
+numactl -N 0 -m 0 python benchmark.py -s 112t -b 3 -i ~/workspaces/datasets/carmel/ArchWestMainStreetEB/
+numactl -N 0 -m 0 python benchmark.py -s 112t -b 5 -i ~/workspaces/datasets/carmel/ArchWestMainStreetEB/
+numactl -N 0 -m 0 python benchmark.py -s 112t -b 10 -i ~/workspaces/datasets/carmel/ArchWestMainStreetEB/
+numactl -N 0 -m 0 python benchmark.py -s 112t -b 20 -i ~/workspaces/datasets/carmel/ArchWestMainStreetEB/
+numactl -N 0 -m 0 python benchmark.py -s 112t -b 40 -i ~/workspaces/datasets/carmel/ArchWestMainStreetEB/
+
