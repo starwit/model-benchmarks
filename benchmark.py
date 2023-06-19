@@ -27,7 +27,7 @@ CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.7
 INFERENCE_SIZE = (640, 640)
 TORCH_DEVICE = torch.device(args.torch_device)
-YOLO_WEIGHTS = f'yolov8{args.yolo_weights}.pt'
+YOLO_WEIGHTS = f'yolov8{args.yolo_size}.pt'
 BATCH_SIZE = args.batch_size
 METRICS_FILE = f'metrics_{TORCH_DEVICE.type.split(":")[0]}_{BATCH_SIZE}.csv'
 
