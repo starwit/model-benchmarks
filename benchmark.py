@@ -4,6 +4,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Iterator
+import argparse
 
 import cv2
 import numpy as np
@@ -16,12 +17,19 @@ from ultralytics.yolo.data.augment import LetterBox
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.ops import non_max_suppression, scale_boxes
 
+argparser = argparse.ArgumentParser()
+argparser.add_argument('-b', '--batch-size', default=10, type=int)
+argparser.add_argument('-d', '--torch-device', default='cpu', type=str)
+argparser.add_argument('-y', '--yolo-size', default='n', type=str)
+args = argparser.parse_args()
+
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.7
 INFERENCE_SIZE = (640, 640)
-TORCH_DEVICE = torch.device('cpu')
-YOLO_WEIGHTS = "yolov8n.pt"
-BATCH_SIZE = 10
+TORCH_DEVICE = torch.device(args.torch_device)
+YOLO_WEIGHTS = f'yolov8{args.yolo_weights}.pt'
+BATCH_SIZE = args.batch_size
+METRICS_FILE = f'metrics_{TORCH_DEVICE.type.split(":")[0]}_{BATCH_SIZE}.csv'
 
 def is_cuda():
     return TORCH_DEVICE.type == 'cuda'
@@ -102,7 +110,7 @@ if __name__ == '__main__':
 
     dataloader = torch.utils.data.DataLoader(FramesDataset('frames', model.stride), batch_size=BATCH_SIZE)
     
-    with open('metrics.csv', 'w', newline='') as metrics_file:
+    with open(METRICS_FILE, 'w', newline='') as metrics_file:
         csv_writer = csv.DictWriter(metrics_file, fieldnames=Metrics.__dataclass_fields__)
         csv_writer.writeheader()
 
