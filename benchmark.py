@@ -18,14 +18,18 @@ from ultralytics.yolo.utils.ops import non_max_suppression, scale_boxes
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.7
 INFERENCE_SIZE = (640, 640)
-TORCH_DEVICE = torch.device('cpu')
+TORCH_DEVICE = torch.device('cuda:0')
 YOLO_WEIGHTS = "yolov8n.pt"
 
 
 @dataclass
 class Metrics:
     inference_start: int = 0
-    inference_time_us: int = 0
+    input_preprocessing: int = 0
+    model: int = 0
+    non_max_suppression: int = 0
+    box_scaling: int = 0
+    total_time_us: int = 0
 
 
 def frame_iter(path):
@@ -43,25 +47,34 @@ def prepare_input(image, stride):
     return out_img.unsqueeze(0)
 
 @torch.no_grad()
-@torch.cpu.amp.autocast()
 def infer(model, input_image):
 
     metrics = Metrics()
         
     inference_start = time.monotonic_ns()
     metrics.inference_start = inference_start
+
     inf_image = prepare_input(input_image, model.stride)
 
+    metrics.input_preprocessing = time.monotonic_ns()
+
     yolo_prediction = model(inf_image)
+
+    metrics.model = time.monotonic_ns()
 
     predictions = non_max_suppression(
         yolo_prediction, 
         conf_thres=CONFIDENCE_THRESHOLD, 
         iou_thres=IOU_THRESHOLD
     )[0]
+
+    metrics.non_max_suppression = time.monotonic_ns()
+    
     predictions[:, :4] = scale_boxes(inf_image.shape[2:], predictions[:, :4], input_image.shape[:2]).round()
 
-    metrics.inference_time_us = (time.monotonic_ns() - inference_start) // 1000
+    metrics.box_scaling = time.monotonic_ns()
+
+    metrics.total_time_us = time.monotonic_ns()
     return metrics, predictions
 
 
@@ -73,14 +86,13 @@ if __name__ == '__main__':
     )
     model.eval()
     input_image_size = check_imgsz(INFERENCE_SIZE, stride=model.stride)
-
-    import intel_extension_for_pytorch as ipex
-    model = ipex.optimize(model, dtype=torch.bfloat16)
     
     with open('metrics.csv', 'w', newline='') as metrics_file:
         csv_writer = csv.DictWriter(metrics_file, fieldnames=Metrics.__dataclass_fields__)
+        csv_writer.writeheader()
 
-        for basename, frame in frame_iter('/home/devcloud/workspaces/videos/ArchWestMainStreetEB'):
+        for basename, frame in frame_iter('frames'):
+            print(f'inferencing {basename}')
             metrics, _ = infer(model, frame)
             csv_writer.writerow(metrics.__dict__)
         
