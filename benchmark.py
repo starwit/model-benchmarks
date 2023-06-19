@@ -21,7 +21,8 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument('-b', '--batch-size', default=10, type=int)
 argparser.add_argument('-d', '--torch-device', default='cpu', type=str)
 argparser.add_argument('-y', '--yolo-size', default='n', type=str)
-argparser.add_argument('-s', '--image-source', default='./frames', type=str)
+argparser.add_argument('-i', '--image-source', default='./frames', type=str)
+argparser.add_argument('-s', '--file-suffix', default='', type=str)
 args = argparser.parse_args()
 
 CONFIDENCE_THRESHOLD = 0.25
@@ -30,7 +31,7 @@ INFERENCE_SIZE = (640, 640)
 TORCH_DEVICE = torch.device(args.torch_device)
 YOLO_WEIGHTS = f'yolov8{args.yolo_size}.pt'
 BATCH_SIZE = args.batch_size
-METRICS_FILE = f'metrics_{TORCH_DEVICE.type.split(":")[0]}_{BATCH_SIZE}.csv'
+METRICS_FILE = f'metrics_yolov8{args.yolo_size}_b{BATCH_SIZE}_{TORCH_DEVICE.type.split(":")[0]}{"_" + args.file_suffix if args.file_suffix != "" else ""}.csv'
 SOURCE_PATH = args.image_source
 
 def is_cuda():
