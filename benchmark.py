@@ -21,6 +21,7 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument('-b', '--batch-size', default=10, type=int)
 argparser.add_argument('-d', '--torch-device', default='cpu', type=str)
 argparser.add_argument('-y', '--yolo-size', default='n', type=str)
+argparser.add_argument('-s', '--image-source', default='./frames', type=str)
 args = argparser.parse_args()
 
 CONFIDENCE_THRESHOLD = 0.25
@@ -30,6 +31,7 @@ TORCH_DEVICE = torch.device(args.torch_device)
 YOLO_WEIGHTS = f'yolov8{args.yolo_size}.pt'
 BATCH_SIZE = args.batch_size
 METRICS_FILE = f'metrics_{TORCH_DEVICE.type.split(":")[0]}_{BATCH_SIZE}.csv'
+SOURCE_PATH = args.image_source
 
 def is_cuda():
     return TORCH_DEVICE.type == 'cuda'
@@ -108,7 +110,7 @@ if __name__ == '__main__':
         import intel_extension_for_pytorch as ipex
         model = ipex.optimize(model)
 
-    dataloader = torch.utils.data.DataLoader(FramesDataset('frames', model.stride), batch_size=BATCH_SIZE)
+    dataloader = torch.utils.data.DataLoader(FramesDataset(SOURCE_PATH, model.stride), batch_size=BATCH_SIZE)
     
     with open(METRICS_FILE, 'w', newline='') as metrics_file:
         csv_writer = csv.DictWriter(metrics_file, fieldnames=Metrics.__dataclass_fields__)
