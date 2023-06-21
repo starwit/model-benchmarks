@@ -3,3 +3,4 @@
 *.pt
 frames
 .git-credentials
+__pycache__

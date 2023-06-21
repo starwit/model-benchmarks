@@ -17,22 +17,32 @@ from ultralytics.yolo.data.augment import LetterBox
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.ops import non_max_suppression, scale_boxes
 
+quantization_types = {
+    'float32': torch.float32,
+    'bfloat16': torch.bfloat16,
+}
+
 argparser = argparse.ArgumentParser()
 argparser.add_argument('-b', '--batch-size', default=10, type=int)
 argparser.add_argument('-d', '--torch-device', default='cpu', type=str)
 argparser.add_argument('-y', '--yolo-size', default='n', type=str)
 argparser.add_argument('-i', '--image-source', default='./frames', type=str)
 argparser.add_argument('-s', '--file-suffix', default='', type=str)
+argparser.add_argument('-q', '--quantization', default='float32', type=str, choices=quantization_types.keys())
+argparser.add_argument('-o', '--output-directory', default='./results', type=str)
+argparser.add_argument('-r', '--inference-size', default=640, type=int)
 args = argparser.parse_args()
 
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.7
-INFERENCE_SIZE = (640, 640)
+INFERENCE_SIZE = (args.inference_size, args.inference_size)
 TORCH_DEVICE = torch.device(args.torch_device)
 YOLO_WEIGHTS = f'yolov8{args.yolo_size}.pt'
 BATCH_SIZE = args.batch_size
 METRICS_FILE = f'metrics_yolov8{args.yolo_size}_b{BATCH_SIZE}_{TORCH_DEVICE.type.split(":")[0]}{"_" + args.file_suffix if args.file_suffix != "" else ""}.csv'
 SOURCE_PATH = args.image_source
+QUANTIZATION_DTYPE = quantization_types[args.quantization]
+OUTPUT_DIRECTORY = args.output_directory
 
 def is_cuda():
     return TORCH_DEVICE.type == 'cuda'
@@ -71,7 +81,6 @@ class FramesDataset(torch.utils.data.IterableDataset):
     
 
 @torch.no_grad()
-@torch.cpu.amp.autocast()
 def infer(model, inf_batch):
 
     metrics = Metrics()
@@ -100,6 +109,8 @@ def infer(model, inf_batch):
 
 
 if __name__ == '__main__':
+    os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
+
     model = AutoBackend(
         YOLO_WEIGHTS,
         device=TORCH_DEVICE,
@@ -110,17 +121,20 @@ if __name__ == '__main__':
 
     if is_cpu():
         import intel_extension_for_pytorch as ipex
-        model = ipex.optimize(model, dtype=torch.bfloat16)
+        model = ipex.optimize(model, dtype=QUANTIZATION_DTYPE)
+    
+    print(f'Torch threads: {torch.get_num_threads()}, ')
 
     dataloader = torch.utils.data.DataLoader(FramesDataset(SOURCE_PATH, model.stride), batch_size=BATCH_SIZE)
     
-    with open(METRICS_FILE, 'w', newline='') as metrics_file:
+    with open(os.path.join(OUTPUT_DIRECTORY, METRICS_FILE), 'w', newline='') as metrics_file:
         csv_writer = csv.DictWriter(metrics_file, fieldnames=Metrics.__dataclass_fields__)
         csv_writer.writeheader()
 
-        for idx, frame_batch in enumerate(dataloader):
-            print(f'inferencing batch {idx} of size {BATCH_SIZE}')
-            metrics, _ = infer(model, frame_batch)
-            csv_writer.writerow(metrics.__dict__)
+        with torch.cpu.amp.autocast(enabled=True if QUANTIZATION_DTYPE is torch.bfloat16 else False):
+            for idx, frame_batch in enumerate(dataloader):
+                print(f'inferencing batch {idx} of size {BATCH_SIZE}')
+                metrics, _ = infer(model, frame_batch)
+                csv_writer.writerow(metrics.__dict__)
         
     
