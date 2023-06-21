@@ -71,6 +71,7 @@ class FramesDataset(torch.utils.data.IterableDataset):
     
 
 @torch.no_grad()
+@torch.cpu.amp.autocast()
 def infer(model, inf_batch):
 
     metrics = Metrics()
@@ -109,7 +110,7 @@ if __name__ == '__main__':
 
     if is_cpu():
         import intel_extension_for_pytorch as ipex
-        model = ipex.optimize(model)
+        model = ipex.optimize(model, dtype=torch.bfloat16)
 
     dataloader = torch.utils.data.DataLoader(FramesDataset(SOURCE_PATH, model.stride), batch_size=BATCH_SIZE)
     
