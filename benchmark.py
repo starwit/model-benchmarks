@@ -123,7 +123,7 @@ if __name__ == '__main__':
         import intel_extension_for_pytorch as ipex
         model = ipex.optimize(model, dtype=QUANTIZATION_DTYPE)
     
-    print(f'Torch threads: {torch.get_num_threads()}, ')
+    print(f'Torch threads: {torch.get_num_threads()}, Torch interop threads: {torch.get_num_interop_threads()}')
 
     dataloader = torch.utils.data.DataLoader(FramesDataset(SOURCE_PATH, model.stride), batch_size=BATCH_SIZE)
     
