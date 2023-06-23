@@ -31,6 +31,7 @@ argparser.add_argument('-s', '--file-suffix', default='', type=str)
 argparser.add_argument('-q', '--quantization', default='float32', type=str, choices=quantization_types.keys())
 argparser.add_argument('-o', '--output-directory', default='./results', type=str)
 argparser.add_argument('-r', '--inference-size', default=640, type=int)
+argparser.add_argument('--ipex', default=True, action=argparse.BooleanOptionalAction)
 args = argparser.parse_args()
 
 CONFIDENCE_THRESHOLD = 0.25
@@ -43,6 +44,7 @@ METRICS_FILE = f'metrics_yolov8{args.yolo_size}_b{BATCH_SIZE}_{TORCH_DEVICE.type
 SOURCE_PATH = args.image_source
 QUANTIZATION_DTYPE = quantization_types[args.quantization]
 OUTPUT_DIRECTORY = args.output_directory
+IPEX_ENABLED = args.ipex
 
 def is_cuda():
     return TORCH_DEVICE.type == 'cuda'
@@ -119,7 +121,7 @@ if __name__ == '__main__':
     model.eval()
     input_image_size = check_imgsz(INFERENCE_SIZE, stride=model.stride)
 
-    if is_cpu():
+    if is_cpu() and IPEX_ENABLED:
         import intel_extension_for_pytorch as ipex
         model = ipex.optimize(model, dtype=QUANTIZATION_DTYPE)
     
