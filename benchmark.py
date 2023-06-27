@@ -1,11 +1,14 @@
 import csv
 import os
 import time
+from PIL import Image
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Iterator
 import argparse
-
+import torch.utils.data as data
+from torchmetrics.detection.map_ap import MeanAveragePrecision
+from pycocotools.coco import COCO
 import cv2
 import numpy as np
 import torch
@@ -80,6 +83,52 @@ class FramesDataset(torch.utils.data.IterableDataset):
         out_img = np.ascontiguousarray(out_img)
         out_img = torch.from_numpy(out_img).to(TORCH_DEVICE).float() / 255.0
         return out_img
+
+
+class CocoDataset(data.Dataset):
+    """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
+
+    def __init__(self, root, json, transform=None):
+        """Set the path for images, captions and vocabulary wrapper.
+
+        Args:
+            root: image directory.
+            json: coco annotation file path.
+            vocab: vocabulary wrapper.
+            transform: image transformer.
+        """
+        self.root = root
+        self.coco = COCO(json)
+        self.ids = list(self.coco.anns.keys())
+        #self.vocab = vocab
+        self.transform = transform
+
+    def __getitem__(self, index):
+        """Returns one data pair (image and caption)."""
+        coco = self.coco
+        #vocab = self.vocab
+        ann_id = self.ids[index]
+        #caption = coco.anns[ann_id]['caption']
+        # we still need the bounding boxes https://www.neuralception.com/cocodatasetapi/
+        target = coco.anns[ann_id]['category_id']
+        img_id = coco.anns[ann_id]['image_id']
+        path = coco.loadImgs(img_id)[0]['file_name']
+
+        image = Image.open(os.path.join(self.root, path)).convert('RGB')
+        if self.transform is not None:
+            image = self.transform(image)
+
+        # Convert caption (string) to word ids.
+        #tokens = nltk.tokenize.word_tokenize(str(caption).lower())
+        #caption = []
+        #caption.append(vocab('<start>'))
+        #caption.extend([vocab(token) for token in tokens])
+        #caption.append(vocab('<end>'))
+        #target = torch.Tensor(caption)
+        return image, target
+
+    def __len__(self):
+        return len(self.ids)
     
 
 @torch.no_grad()
@@ -127,16 +176,21 @@ if __name__ == '__main__':
     
     print(f'Torch threads: {torch.get_num_threads()}, Torch interop threads: {torch.get_num_interop_threads()}')
 
-    dataloader = torch.utils.data.DataLoader(FramesDataset(SOURCE_PATH, model.stride), batch_size=BATCH_SIZE)
-    
+    #dataloader = torch.utils.data.DataLoader(FramesDataset(SOURCE_PATH, model.stride), batch_size=BATCH_SIZE)
+    dataloader = torch.utils.data.DataLoader(CocoDataset(SOURCE_PATH + "/images", SOURCE_PATH + "labels.json"),
+                                             batch_size=BATCH_SIZE)
+
+    eval_metric = MeanAveragePrecision()
+
     with open(os.path.join(OUTPUT_DIRECTORY, METRICS_FILE), 'w', newline='') as metrics_file:
         csv_writer = csv.DictWriter(metrics_file, fieldnames=Metrics.__dataclass_fields__)
         csv_writer.writeheader()
 
         with torch.cpu.amp.autocast(enabled=True if QUANTIZATION_DTYPE is torch.bfloat16 else False):
-            for idx, frame_batch in enumerate(dataloader):
+            for idx, (img_batch, tar_batch) in enumerate(dataloader):
                 print(f'inferencing batch {idx} of size {BATCH_SIZE}')
-                metrics, _ = infer(model, frame_batch)
+                metrics, predictions = infer(model, img_batch)
+                eval_metric.update(predictions, tar_batch)
                 csv_writer.writerow(metrics.__dict__)
         
-    
+    print(eval_metric)
