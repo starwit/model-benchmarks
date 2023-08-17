@@ -5,3 +5,5 @@ frames
 .git-credentials
 __pycache__
 results
+*.pdf
+*.png
